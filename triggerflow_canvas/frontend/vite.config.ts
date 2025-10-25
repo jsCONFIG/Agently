@@ -1,6 +1,8 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+const TEST_INCLUDE = "../../tests/triggerflow_canvas/frontend/**/*.test.{ts,tsx}";
+
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -12,5 +14,11 @@ export default defineConfig({
         secure: false
       }
     }
+  },
+  test: {
+    globals: true,
+    environment: "jsdom",
+    setupFiles: "./src/tests/setup.ts",
+    include: [TEST_INCLUDE]
   }
 });
