@@ -1,51 +1,37 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
+from collections import deque
+from contextvars import ContextVar
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, AsyncIterator, Dict, Iterable, List, Mapping, Optional
 
+from agently import TriggerFlow
+from agently.types.trigger_flow import TriggerFlowEventData
+
+
+_active_debugger: ContextVar["NodeDebugger | None"] = ContextVar(
+    "triggerflow_canvas_active_debugger", default=None
+)
+
 
 @dataclass
-class ExecutionStep:
+class NodeSpec:
     id: str
     type: str
     label: str
     configuration: Dict[str, Any]
-
-
-@dataclass
-class DebugOverride:
-    """Per-node debugging instructions injected during simulation."""
-
-    outputs: List[str] = field(default_factory=list)
-    input_payload: Any | None = None
-    notes: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-    @classmethod
-    def from_mapping(cls, data: Mapping[str, Any]) -> "DebugOverride":
-        outputs: Any = data.get("outputs") or data.get("output") or data.get("responses") or []
-        if isinstance(outputs, (str, bytes)):
-            outputs = [str(outputs)]
-        elif isinstance(outputs, Mapping):
-            outputs = [str(item) for item in outputs.values()]
-        elif isinstance(outputs, Iterable):
-            outputs = [str(item) for item in outputs]
-        else:
-            outputs = []
-        notes = data.get("notes") or data.get("note") or data.get("description")
-        input_payload = data.get("input") or data.get("payload")
-        reserved_keys = {"outputs", "output", "responses", "notes", "note", "description", "input", "payload"}
-        metadata = {key: value for key, value in data.items() if key not in reserved_keys}
-        return cls(outputs=list(outputs), input_payload=input_payload, notes=notes, metadata=metadata)
+    is_terminal: bool = False
 
 
 @dataclass
 class ExecutionPlan:
     workflow_id: str
-    steps: List[ExecutionStep]
-    debug_overrides: Dict[str, DebugOverride] = field(default_factory=dict)
+    flow: Optional[TriggerFlow]
+    nodes: Dict[str, NodeSpec]
+    start_node_id: Optional[str]
+    initial_payload: Any
 
 
 @dataclass
@@ -63,7 +49,7 @@ class NodeDebugger:
     def __init__(self) -> None:
         self._events: List[DebugEvent] = []
 
-    def record(self, step: ExecutionStep, event: str, payload: Optional[Mapping[str, Any]] = None) -> None:
+    def record(self, step: NodeSpec, event: str, payload: Optional[Mapping[str, Any]] = None) -> None:
         self._events.append(
             DebugEvent(
                 timestamp=datetime.now(UTC),
@@ -95,98 +81,268 @@ class NodeDebugger:
 
 
 class TriggerFlowConnector:
-    """Converts workflow definitions into an executable plan and runs them sequentially."""
+    """Compile TriggerFlow Canvas definitions into runnable TriggerFlow pipelines."""
 
     async def compile(self, workflow: Dict[str, Any]) -> ExecutionPlan:
-        steps: List[ExecutionStep] = []
+        nodes: Dict[str, NodeSpec] = {}
         for node in workflow.get("nodes", []):
-            step = ExecutionStep(
+            nodes[node["id"]] = NodeSpec(
                 id=node["id"],
                 type=node["type"],
                 label=node.get("label", node["type"]),
                 configuration=node.get("configuration", {}),
             )
-            steps.append(step)
-        debug_overrides = self._resolve_debug_overrides(workflow, steps)
-        return ExecutionPlan(workflow_id=workflow.get("id", ""), steps=steps, debug_overrides=debug_overrides)
+
+        if not nodes:
+            return ExecutionPlan(
+                workflow_id=workflow.get("id", ""),
+                flow=None,
+                nodes={},
+                start_node_id=None,
+                initial_payload=None,
+            )
+
+        flow = TriggerFlow(name=workflow.get("name") or workflow.get("id") or "canvas-flow")
+        adjacency, indegree = self._build_graph(nodes, workflow.get("edges", []))
+        self._validate_graph(adjacency, indegree)
+
+        start_candidates = [node_id for node_id, degree in indegree.items() if degree == 0]
+        start_node = start_candidates[0]
+
+        order = self._topological_order(adjacency, indegree, start_node)
+        chunks: Dict[str, Any] = {}
+        for node_id in order:
+            spec = nodes[node_id]
+            spec.is_terminal = not adjacency[node_id]
+            handler = self._make_handler(spec)
+            chunks[node_id] = flow.chunk(spec.id)(handler)
+
+        process_map: Dict[str, Any] = {}
+        process_map[start_node] = flow.to(chunks[start_node])
+
+        for node_id in order:
+            for successor in adjacency[node_id]:
+                process = process_map[node_id]
+                next_process = process.to(chunks[successor])
+                process_map[successor] = next_process
+
+        for node_id, process in process_map.items():
+            if not adjacency[node_id]:
+                process.end()
+
+        initial_payload = self._initial_payload(nodes[start_node])
+        return ExecutionPlan(
+            workflow_id=workflow.get("id", ""),
+            flow=flow,
+            nodes=nodes,
+            start_node_id=start_node,
+            initial_payload=initial_payload,
+        )
 
     async def execute(self, plan: ExecutionPlan, debugger: Optional[NodeDebugger] = None) -> AsyncIterator[str]:
-        if not plan.steps:
+        if not plan.nodes or plan.flow is None or plan.start_node_id is None:
             yield self._format_log("工作流中未包含可执行节点。")
             return
 
-        for index, step in enumerate(plan.steps, start=1):
-            header = self._format_log(f"开始执行节点[{index}/{len(plan.steps)}]: {step.label}")
-            if debugger:
-                debugger.record(step, "start", {"index": index})
-            yield header
-            await asyncio.sleep(0)  # allow event loop to switch context
-            override = plan.debug_overrides.get(step.id)
-            for message in self._simulate_step(step, override, debugger):
-                yield message
-            if debugger:
-                debugger.record(step, "completed", {"index": index})
-        yield self._format_log("工作流执行完成。")
+        token = _active_debugger.set(debugger)
+        execution = plan.flow.create_execution()
+        runner = asyncio.create_task(
+            execution.async_start(plan.initial_payload, wait_for_result=False)
+        )
+        try:
+            yield self._format_log(
+                f"开始执行工作流: {plan.flow.name} (ID: {plan.workflow_id or plan.flow.name})"
+            )
+            async for item in execution.get_async_runtime_stream(timeout=None):
+                yield self._format_log(self._stringify_stream_item(item))
+            result = await execution.async_get_result(timeout=None)
+            if result is not None:
+                yield self._format_log(f"工作流执行结果: {self._summarize(result)}")
+            yield self._format_log("工作流执行完成。")
+        finally:
+            _active_debugger.reset(token)
+            await runner
 
-    def _resolve_debug_overrides(
-        self, workflow: Dict[str, Any], steps: List[ExecutionStep]
-    ) -> Dict[str, DebugOverride]:
-        debug_section = workflow.get("debug")
-        if not isinstance(debug_section, Mapping):
-            return {}
-        node_overrides = debug_section.get("nodes", {})
-        if not isinstance(node_overrides, Mapping):
-            return {}
+    def _make_handler(self, spec: NodeSpec):
+        async def _handler(event: TriggerFlowEventData) -> Any:
+            debugger = _active_debugger.get()
+            if debugger:
+                debugger.record(spec, "start")
 
-        resolved: Dict[str, DebugOverride] = {}
-        for step in steps:
-            override_config = self._match_override(step, node_overrides)
-            if override_config is not None:
-                resolved[step.id] = DebugOverride.from_mapping(override_config)
-        return resolved
+            await event.async_put_into_stream(
+                f"节点 {spec.label} (类型 {spec.type}) 开始执行"
+            )
+
+            try:
+                result = await self._execute_node(spec, event)
+            except Exception as exc:  # pragma: no cover - defensive guard
+                await event.async_put_into_stream(
+                    f"节点 {spec.label} 执行失败: {exc}"
+                )
+                if debugger:
+                    debugger.record(spec, "error", {"message": str(exc)})
+                raise
+
+            await event.async_put_into_stream(
+                f"节点 {spec.label} 输出: {self._summarize(result)}"
+            )
+            if spec.is_terminal:
+                await event.async_stop_stream()
+            if debugger:
+                debugger.record(spec, "completed", {"result": result})
+            return result
+
+        return _handler
+
+    async def _execute_node(self, spec: NodeSpec, event: TriggerFlowEventData) -> Any:
+        if spec.type == "trigger.http":
+            return await self._execute_http_trigger(spec, event)
+        if spec.type == "action.chat_completion":
+            return await self._execute_chat_completion(spec, event)
+        if spec.type == "action.http_request":
+            return await self._execute_http_request(spec, event)
+        return event.value
+
+    async def _execute_http_trigger(self, spec: NodeSpec, event: TriggerFlowEventData) -> Dict[str, Any]:
+        config = spec.configuration
+        method = str(config.get("method", "GET")).upper()
+        path = config.get("path", "/")
+        payload = config.get("samplePayload") or event.value or {}
+        timestamp = datetime.now(UTC).isoformat()
+        request = {
+            "method": method,
+            "path": path,
+            "timestamp": timestamp,
+            "payload": payload,
+        }
+        await event.async_set_runtime_data(f"nodes.{spec.id}.request", request)
+        return request
+
+    async def _execute_chat_completion(
+        self, spec: NodeSpec, event: TriggerFlowEventData
+    ) -> Dict[str, Any]:
+        config = spec.configuration
+        model = config.get("model", "gpt-4o-mini")
+        prompt = config.get("prompt", "")
+        incoming = event.value or {}
+        user_message = incoming.get("payload", {}).get("message") if isinstance(incoming, dict) else None
+        if not user_message:
+            user_message = incoming.get("reply") if isinstance(incoming, dict) else None
+        if not user_message:
+            user_message = prompt
+        reply = f"{model} 回复: {user_message}" if user_message else f"{model} 生成了一个空回复"
+        history_key = f"nodes.{spec.id}.history"
+        history = event.get_runtime_data(history_key, []) or []
+        history.append({"prompt": user_message, "reply": reply})
+        await event.async_set_runtime_data(history_key, history)
+        return {
+            "model": model,
+            "prompt": user_message,
+            "reply": reply,
+            "history": history,
+        }
+
+    async def _execute_http_request(
+        self, spec: NodeSpec, event: TriggerFlowEventData
+    ) -> Dict[str, Any]:
+        config = spec.configuration
+        method = str(config.get("method", "GET")).upper()
+        url = config.get("url", "")
+        payload = event.value or {}
+        response = {
+            "status": 200,
+            "body": {
+                "echo": payload,
+                "note": "模拟请求已执行，未进行真实的网络调用。",
+            },
+            "headers": {"content-type": "application/json"},
+        }
+        await event.async_set_runtime_data(
+            f"nodes.{spec.id}.response",
+            {"method": method, "url": url, "response": response},
+        )
+        return {
+            "method": method,
+            "url": url,
+            "payload": payload,
+            "response": response,
+        }
+
+    def _build_graph(
+        self, nodes: Dict[str, NodeSpec], edges: Iterable[Mapping[str, Any]]
+    ) -> tuple[Dict[str, List[str]], Dict[str, int]]:
+        adjacency: Dict[str, List[str]] = {node_id: [] for node_id in nodes}
+        indegree: Dict[str, int] = {node_id: 0 for node_id in nodes}
+
+        for edge in edges:
+            source = edge.get("from", {}).get("nodeId")
+            target = edge.get("to", {}).get("nodeId")
+            if source not in nodes or target not in nodes:
+                raise ValueError("连线引用了不存在的节点，请检查流程配置。")
+            adjacency[source].append(target)
+            indegree[target] += 1
+
+        return adjacency, indegree
+
+    def _validate_graph(self, adjacency: Dict[str, List[str]], indegree: Dict[str, int]) -> None:
+        for node_id, outgoing in adjacency.items():
+            if len(outgoing) > 1:
+                raise ValueError(
+                    f"节点 {node_id} 存在多个输出分支，目前的执行器仅支持单一路径。"
+                )
+        for node_id, degree in indegree.items():
+            if degree > 1:
+                raise ValueError(
+                    f"节点 {node_id} 存在多个输入分支，目前的执行器仅支持单一路径。"
+                )
+        start_nodes = [node_id for node_id, degree in indegree.items() if degree == 0]
+        if not start_nodes:
+            raise ValueError("流程缺少入口节点，请至少保留一个触发器。")
+        if len(start_nodes) > 1:
+            raise ValueError("检测到多个入口节点，目前仅支持单一入口的工作流。")
+
+    def _topological_order(
+        self,
+        adjacency: Dict[str, List[str]],
+        indegree: Dict[str, int],
+        start_node: str,
+    ) -> List[str]:
+        indegree_copy = indegree.copy()
+        queue: deque[str] = deque([start_node])
+        order: List[str] = []
+
+        while queue:
+            node_id = queue.popleft()
+            order.append(node_id)
+            for successor in adjacency[node_id]:
+                indegree_copy[successor] -= 1
+                if indegree_copy[successor] == 0:
+                    queue.append(successor)
+
+        if len(order) != len(adjacency):
+            raise ValueError("流程存在闭环或与主干断开的节点，无法编译。")
+        return order
+
+    def _initial_payload(self, spec: NodeSpec) -> Any:
+        if spec.type == "trigger.http":
+            config = spec.configuration
+            return {
+                "method": str(config.get("method", "GET")).upper(),
+                "path": config.get("path", "/"),
+                "payload": config.get("samplePayload", {}),
+            }
+        return {}
 
     @staticmethod
-    def _match_override(step: ExecutionStep, overrides: Mapping[str, Any]) -> Optional[Mapping[str, Any]]:
-        for key in (step.id, step.label, step.type):
-            if key in overrides:
-                candidate = overrides[key]
-                if isinstance(candidate, Mapping):
-                    return candidate
-        return None
+    def _stringify_stream_item(item: Any) -> str:
+        if isinstance(item, str):
+            return item
+        return TriggerFlowConnector._summarize(item)
 
-    def _simulate_step(
-        self,
-        step: ExecutionStep,
-        override: Optional[DebugOverride],
-        debugger: Optional[NodeDebugger],
-    ) -> Iterable[str]:
-        yield self._format_log(
-            f"节点 {step.label} 类型 {step.type} 使用配置 {step.configuration}"
-        )
-
-        if override:
-            if debugger:
-                debugger.record(step, "override", {
-                    "notes": override.notes,
-                    "metadata": override.metadata,
-                    "has_outputs": bool(override.outputs),
-                })
-            if override.notes:
-                yield self._format_log(f"调试备注: {override.notes}")
-            if override.input_payload is not None:
-                yield self._format_log(f"模拟输入: {override.input_payload}")
-            if override.outputs:
-                for idx, output in enumerate(override.outputs, start=1):
-                    yield self._format_log(f"调试输出[{idx}]: {output}")
-            else:
-                yield self._format_log("调试配置未提供输出，使用默认占位响应。")
-            if override.metadata:
-                yield self._format_log(f"调试元数据: {override.metadata}")
-        else:
-            yield self._format_log("未开启调试覆盖，返回默认占位响应。")
-
-        timestamp = datetime.now(UTC).isoformat()
-        yield self._format_log(f"{step.label} @ {timestamp}: 执行完成。")
+    @staticmethod
+    def _summarize(value: Any) -> str:
+        text = str(value)
+        return text if len(text) <= 160 else text[:157] + "..."
 
     @staticmethod
     def _format_log(message: str) -> str:

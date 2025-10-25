@@ -4,18 +4,18 @@ from typing import Sequence
 
 from .engine import (
     DebugEvent,
-    DebugOverride,
     ExecutionPlan,
     NodeDebugger,
+    NodeSpec,
     TriggerFlowConnector,
     run_workflow,
 )
 
 __all__ = [
     "DebugEvent",
-    "DebugOverride",
     "ExecutionPlan",
     "NodeDebugger",
+    "NodeSpec",
     "TriggerFlowConnector",
     "check_environment",
     "format_report",

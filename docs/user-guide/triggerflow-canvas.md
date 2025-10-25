@@ -24,11 +24,10 @@ docker compose up --build
 
 默认会启动以下组件：
 
-- **backend**：基于 FastAPI 的工作流与运行日志 API，监听 `8000` 端口。
+- **backend**：基于 FastAPI 的工作流与运行日志 API，内嵌 TriggerFlow Runtime，监听 `8000` 端口。
 - **frontend**：Vite + React 前端开发服务器，监听 `5173` 端口。
-- **triggerflow-core**：触发器执行核心，运行 `triggerflow_canvas.connector.core` 中的占位实现。
 
-启动完成后访问 `http://localhost:5173` 即可进入 Canvas 页面。
+启动完成后访问 `http://localhost:5173` 即可进入 Canvas 页面。后端容器内已经集成 TriggerFlow Runtime，因此无需额外的核心服务进程。
 
 > 💡 首次启动会创建前端依赖缓存并编译 TypeScript，时间可能略长。建议在首次成功后使用 `docker compose up` 以复用镜像。
 
@@ -84,7 +83,7 @@ DATABASE_URL = os.getenv("TRIGGERFLOW_DATABASE_URL", "sqlite+aiosqlite:///./trig
 
 - `backend` 通过 `uvicorn triggerflow_canvas.backend.main:app --host 0.0.0.0 --port 8000` 启动。如需修改监听端口，可调整命令参数或在 Docker Compose 中设置 `ports`。
 - 前端使用 `npm run dev -- --host 0.0.0.0 --port 5173`。生产部署建议改为 `npm run build` 并使用静态资源服务器或反向代理承载。
-- TriggerFlow 核心示例命令为 `python -m triggerflow_canvas.connector.core`，该模块目前输出占位提示，可替换为自定义 TriggerFlow Runtime 入口。
+- TriggerFlow Runtime 已直接内嵌在后端容器中，`TriggerFlowConnector` 会在 FastAPI 进程内构建并运行流程。如需扩展底层执行器，可在后端代码中替换连接器实现，而无需单独部署核心进程。
 
 ### API & CORS
 
@@ -98,7 +97,7 @@ DATABASE_URL = os.getenv("TRIGGERFLOW_DATABASE_URL", "sqlite+aiosqlite:///./trig
 
 ### 执行日志没有输出？
 
-`TriggerFlowConnector.execute` 会逐步模拟节点执行并通过 Server-Sent Events 推送日志。请检查前端监听到的 `runId` 是否有效，或查看后端日志中是否存在异常（`/api/runs/{run_id}/logs`）。
+`TriggerFlowConnector.execute` 会实时调用 TriggerFlow Runtime，节点处理逻辑会通过 Server-Sent Events 推送日志。请检查前端监听到的 `runId` 是否有效，或查看后端日志中是否存在异常（`/api/runs/{run_id}/logs`）。
 
 ### 如何清空或迁移工作流数据？
 
@@ -114,29 +113,15 @@ DATABASE_URL = os.getenv("TRIGGERFLOW_DATABASE_URL", "sqlite+aiosqlite:///./trig
 
 ### 如何在无模型服务的环境下调试流程？
 
-`TriggerFlowConnector` 支持在工作流 JSON 中为节点配置调试覆盖：
+当前内置节点（HTTP 触发器、聊天补全、HTTP 请求）都会生成可重复的模拟结果，不依赖外部模型服务。可在画布中配置 `samplePayload`、`prompt`、`url` 等字段后直接执行，日志会显示 TriggerFlow Runtime 的实时输出。
 
-```json
-{
-  "debug": {
-    "nodes": {
-      "llm-node": {
-        "notes": "使用伪响应",
-        "input": {"messages": ["hello"]},
-        "outputs": ["Hi from debugger"]
-      }
-    }
-  }
-}
-```
-
-在 Python 侧可通过 `NodeDebugger` 捕获节点执行时间线：
+如需分析节点执行时间线，可在 Python 侧使用 `NodeDebugger`：
 
 ```python
 from triggerflow_canvas.connector import NodeDebugger, run_workflow
 
 debugger = NodeDebugger()
-workflow = {...}
+workflow = {...}  # 画布导出的 JSON
 
 async for log in run_workflow(workflow, debugger=debugger):
     print(log)
@@ -144,17 +129,21 @@ async for log in run_workflow(workflow, debugger=debugger):
 print(debugger.as_dict())
 ```
 
-下图展示了调试日志的典型输出：
+`debugger.as_dict()` 会返回每个节点的开始、结束以及产出数据等事件，可在自定义脚本中生成报告或进行断言。
 
-![TriggerFlow Canvas 调试日志](../assets/triggerflow-debug-session.svg)
+### 已知限制
+
+- 当前连接器仅支持**单入口、单分支**的顺序流程，暂不支持并行分支或多个触发器。若画布中存在多个入口或交叉连线，后端会在执行时给出错误提示。
+- 仅内置了三个示例节点类型：`trigger.http`、`action.chat_completion`、`action.http_request`。其余节点需要自行扩展前端模板与后端执行逻辑。
+- 聊天节点使用内置的占位逻辑，不会访问真实的 LLM 服务，适用于流程设计与调试阶段。若需调用实际模型，可在 `_execute_chat_completion` 中接入第三方 API。
 
 ## 触发器与节点开发指南
 
 TriggerFlow Canvas 的后端通过 `TriggerFlowConnector` 将画布节点转换为执行计划。要扩展新触发器或动作节点，可按以下步骤进行：
 
 1. **定义节点模板（前端）**：在 `triggerflow_canvas/frontend/src/App.tsx` 中的 `templates` 数组新增节点类型，设置 `type`、`label`、`description` 与 `defaultConfiguration`，并根据端口方向定义 `ports`。
-2. **扩展执行计划编译器**：在 `triggerflow_canvas/connector/engine.py` 中的 `TriggerFlowConnector.compile` 方法里解析新节点的 `type` 和配置，将其转换为 `ExecutionStep`。
-3. **实现运行逻辑**：在 `TriggerFlowConnector._simulate_step` 或新的执行函数中，根据节点配置调用对应的 TriggerFlow 处理器。例如对于真正的聊天节点，可使用 `Agently.create_agent()` 并将生成的响应写入日志流。
+2. **扩展执行计划编译器**：在 `triggerflow_canvas/connector/engine.py` 中的 `TriggerFlowConnector.compile` 方法里解析新节点的 `type` 和配置，将其转换为 `NodeSpec` 并注入到 TriggerFlow 链路。
+3. **实现运行逻辑**：在 `_execute_node` 函数中根据节点类型添加分支，调用实际的 TriggerFlow 处理器或外部服务，并通过 `event.async_put_into_stream()` / `event.async_set_runtime_data()` 写入日志与状态。
 4. **注册触发器**：如需新增外部触发源，可在前端模板中定义 `trigger.xxx` 类型节点，并在后端 `execute` 方法中处理该节点，或在核心服务中监听外部事件并调用 TriggerFlow runtime。
 
 ### 与 TriggerFlow Runtime 集成
