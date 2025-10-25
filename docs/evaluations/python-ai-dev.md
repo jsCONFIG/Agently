@@ -27,3 +27,15 @@
 2. 提供 `poetry.lock` 重新生成与缓存依赖的官方流程，避免安装被动失败。
 3. 为 npm 安装写明如何配置代理/镜像，或提供预打包的前端构建产物。
 4. 增强 `TriggerFlowConnector` 的模拟执行，让 AI 节点可以插入可配置的伪响应，方便在离线环境验证链路。
+
+## 优先级任务列表
+
+| 优先级 | 问题 & 背景 | 解决方案概要 | 状态 | 负责人 |
+| ------ | ------------ | ------------ | ---- | ------ |
+| P0 | `poetry install` 与 `poetry.lock` 不一致导致依赖安装失败。 | 在用户指南加入锁文件更新流程，并提供自动化预检脚本提示需要重新生成锁。 | ✅ 已完成 | TriggerFlow Canvas 团队 |
+| P0 | npm 403 导致前端依赖无法获取。 | 文档新增企业代理/镜像配置示例，并在预检脚本报告缺失的 npm。 | ✅ 已完成 | TriggerFlow Canvas 团队 |
+| P1 | Docker 未安装且文档无替代方案。 | 发布命令行预检工具，输出 Docker 缺失的警告及替代启动建议。 | ✅ 已完成 | TriggerFlow Canvas 团队 |
+| P1 | 无法在离线环境验证节点行为。 | 为 `TriggerFlowConnector` 增加节点调试覆盖与可视化日志。 | ✅ 已完成 | TriggerFlow Canvas 团队 |
+| P2 | 缺乏集中任务追踪与版本结论。 | 创建 `docs/release-notes/triggerflow-canvas.md` 记录迭代结果并维护任务清单。 | ✅ 已完成 | TriggerFlow Canvas 团队 |
+
+> 详细任务拆解见 `docs/product/triggerflow-canvas/backlog.md`。
