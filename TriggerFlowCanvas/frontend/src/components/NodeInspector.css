@@ -1,0 +1,74 @@
+.node-inspector {
+  padding: 1.5rem;
+  background: #f8fafc;
+  border-left: 1px solid #cbd5f5;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.node-inspector h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.node-inspector__section {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.node-inspector label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #475569;
+}
+
+.node-inspector input,
+.node-inspector textarea {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid #cbd5f5;
+  background: #ffffff;
+  font-size: 0.9rem;
+  color: #0f172a;
+  resize: vertical;
+}
+
+.node-inspector__type {
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  background-color: #e0e7ff;
+  color: #312e81;
+  font-size: 0.75rem;
+  font-weight: 700;
+  align-self: flex-start;
+  text-transform: uppercase;
+}
+
+.node-inspector__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.node-inspector__delete {
+  margin-top: 2rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 0.5rem;
+  border: 1px solid #ef4444;
+  background: transparent;
+  color: #b91c1c;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.node-inspector__delete:hover {
+  background-color: #fee2e2;
+}
