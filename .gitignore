@@ -152,3 +152,7 @@ demo_*
 
 # MacOS DS_Store
 .DS_Store
+
+# Frontend artifacts
+TriggerFlowCanvas/frontend/node_modules/
+TriggerFlowCanvas/frontend/dist/

@@ -1,0 +1,40 @@
+{
+  "nodes": [
+    {
+      "id": "start",
+      "name": "Start",
+      "type": "start",
+      "config": {},
+      "position": {"x": 100, "y": 200}
+    },
+    {
+      "id": "echo",
+      "name": "Greeting",
+      "type": "echo",
+      "config": {"template": "Hello, {value}!"},
+      "position": {"x": 320, "y": 200}
+    },
+    {
+      "id": "uppercase",
+      "name": "Shout",
+      "type": "uppercase",
+      "config": {},
+      "position": {"x": 540, "y": 200}
+    },
+    {
+      "id": "output",
+      "name": "Result",
+      "type": "output",
+      "config": {"label": "Final"},
+      "position": {"x": 760, "y": 200}
+    }
+  ],
+  "edges": [
+    {"id": "start_echo", "source": "start", "target": "echo"},
+    {"id": "echo_uppercase", "source": "echo", "target": "uppercase"},
+    {"id": "uppercase_output", "source": "uppercase", "target": "output"}
+  ],
+  "metadata": {
+    "description": "Default welcome flow"
+  }
+}

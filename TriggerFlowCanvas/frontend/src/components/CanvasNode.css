@@ -1,0 +1,27 @@
+.canvas-node {
+  padding: 0.75rem 1rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background-color: #ffffff;
+  min-width: 140px;
+  box-shadow: 0 10px 25px -20px rgba(15, 23, 42, 0.4);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.canvas-node__name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.canvas-node__type {
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.react-flow__node.selected .canvas-node {
+  transform: translateY(-1px);
+}

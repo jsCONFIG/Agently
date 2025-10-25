@@ -1,0 +1,134 @@
+.app-shell {
+  display: grid;
+  grid-template-columns: 280px 1fr 320px;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.canvas-container {
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(circle at top, #f8fafc 0%, #e2e8f0 70%);
+}
+
+.canvas-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #cbd5f5;
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(6px);
+}
+
+.canvas-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.canvas-toolbar h1 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.canvas-toolbar input[type='text'] {
+  padding: 0.55rem 0.8rem;
+  border-radius: 0.75rem;
+  border: 1px solid #cbd5f5;
+  min-width: 220px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.canvas-toolbar button {
+  padding: 0.6rem 1.1rem;
+  border-radius: 0.75rem;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  background: #e2e8f0;
+  color: #0f172a;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.canvas-toolbar button.primary {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #ffffff;
+}
+
+.canvas-toolbar button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.canvas-toolbar button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.canvas-body {
+  flex: 1;
+  position: relative;
+}
+
+.canvas-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  color: #475569;
+}
+
+.canvas-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  border-top: 1px solid #cbd5f5;
+  background: rgba(248, 250, 252, 0.8);
+  gap: 1rem;
+  min-height: 56px;
+}
+
+.status {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #1f2937;
+}
+
+.status--success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status--error {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.status--warning {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.execution-result {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: #1f2937;
+}
+
+.execution-result strong {
+  font-weight: 700;
+}
+
+.canvas-toolbar__user-input {
+  min-width: 200px;
+}
