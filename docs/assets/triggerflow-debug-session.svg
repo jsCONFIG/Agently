@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-labelledby="title desc">
+  <title id="title">TriggerFlow Canvas 调试日志示意</title>
+  <desc id="desc">示例展示 NodeDebugger 记录的节点执行时间线。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1f2937" />
+      <stop offset="100%" stop-color="#111827" />
+    </linearGradient>
+    <style>
+      text { font-family: "Fira Code", "Consolas", monospace; fill: #e5e7eb; }
+      .title { font-size: 24px; font-weight: bold; }
+      .subtitle { font-size: 16px; fill: #9ca3af; }
+      .log { font-size: 14px; }
+      .badge { fill: #2563eb; stroke: #60a5fa; stroke-width: 1; }
+      .badge-text { font-size: 12px; fill: #dbeafe; }
+      .panel { fill: rgba(17, 24, 39, 0.7); stroke: #374151; stroke-width: 2; rx: 12; }
+    </style>
+  </defs>
+  <rect x="0" y="0" width="640" height="360" fill="url(#bg)" />
+  <rect x="32" y="64" width="576" height="248" class="panel" />
+  <text x="40" y="96" class="title">NodeDebugger Timeline</text>
+  <text x="40" y="120" class="subtitle">workflow: demo-pipeline • run: 2025-10-25T10:18:00Z</text>
+  <g transform="translate(48, 144)">
+    <rect x="0" y="-18" width="82" height="24" class="badge" rx="6" />
+    <text x="12" y="0" class="badge-text">HTTP_TRIGGER</text>
+    <text x="104" y="0" class="log">[10:18:01] start • index=1</text>
+    <text x="104" y="24" class="log">[10:18:01] config → {'method': 'POST', 'path': '/webhook'}</text>
+    <text x="104" y="48" class="log">[10:18:01] completed • 32ms</text>
+  </g>
+  <g transform="translate(48, 224)">
+    <rect x="0" y="-18" width="64" height="24" class="badge" rx="6" />
+    <text x="12" y="0" class="badge-text">LLM</text>
+    <text x="104" y="0" class="log">[10:18:02] start • index=2</text>
+    <text x="104" y="24" class="log">[10:18:02] 调试备注: 使用伪响应验证链路</text>
+    <text x="104" y="48" class="log">[10:18:02] 调试输出[1]: 你好，我是调试响应</text>
+    <text x="104" y="72" class="log">[10:18:02] completed • 41ms</text>
+  </g>
+</svg>

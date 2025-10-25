@@ -4,6 +4,16 @@ TriggerFlow Canvas 是面向 Agently TriggerFlow 工作流的可视化编排与�
 
 ## 快速安装
 
+### 环境预检
+
+在首次拉取仓库后执行以下命令，确认本地已安装必须的依赖工具：
+
+```bash
+python -m triggerflow_canvas.connector.preflight
+```
+
+该命令会检测 Poetry、Node.js、npm 与 Docker 是否可用，并给出版本信息及缺失提示。如遇 `poetry` 与 `poetry.lock` 不匹配，可参考“常见问题”章节中的锁文件修复指南。
+
 ### 通过 Docker Compose 启动（推荐）
 
 仓库内置 `docker-compose.yml`，一次性启动前端、后端与 TriggerFlow 核心服务：
@@ -27,16 +37,22 @@ docker compose up --build
 若希望分别运行前端与后端，可按如下步骤手动安装：
 
 1. 安装 Python 3.11+ 与 Node.js 18+。
-2. 安装项目依赖：
+2. 若 `poetry.lock` 与 `pyproject.toml` 不一致导致安装失败，可执行 `poetry lock --no-update` 重新生成锁文件，再运行 `poetry install`。
+3. 安装项目依赖：
    ```bash
    poetry install
    cd triggerflow_canvas/frontend && npm install
    ```
-3. 启动 TriggerFlow Canvas 后端：
+   - 处于受限网络环境时，可先设置 npm 镜像：
+     ```bash
+     npm config set registry https://registry.npmmirror.com
+     npm config set @playwright/test:registry https://registry.npmmirror.com
+     ```
+4. 启动 TriggerFlow Canvas 后端：
    ```bash
    poetry run uvicorn triggerflow_canvas.backend.main:app --reload --port 8000
    ```
-4. 另开终端启动前端：
+5. 另开终端启动前端：
    ```bash
    cd triggerflow_canvas/frontend
    npm run dev -- --host 0.0.0.0 --port 5173
@@ -91,6 +107,46 @@ DATABASE_URL = os.getenv("TRIGGERFLOW_DATABASE_URL", "sqlite+aiosqlite:///./trig
 ### Docker 启动失败显示 `Cannot connect to proxy`？
 
 这是因构建阶段无法连接外部依赖导致，可在受限网络环境中通过设置企业代理或提前下载依赖（例如在内网镜像中缓存 npm/pip 包）。
+
+### `poetry install` 提示锁文件过期？
+
+执行 `poetry lock --no-update` 同步锁文件后重新运行 `poetry install`。如仍失败，可删除 `poetry.lock` 并执行 `poetry lock && poetry install`，然后将新的锁文件提交到仓库。
+
+### 如何在无模型服务的环境下调试流程？
+
+`TriggerFlowConnector` 支持在工作流 JSON 中为节点配置调试覆盖：
+
+```json
+{
+  "debug": {
+    "nodes": {
+      "llm-node": {
+        "notes": "使用伪响应",
+        "input": {"messages": ["hello"]},
+        "outputs": ["Hi from debugger"]
+      }
+    }
+  }
+}
+```
+
+在 Python 侧可通过 `NodeDebugger` 捕获节点执行时间线：
+
+```python
+from triggerflow_canvas.connector import NodeDebugger, run_workflow
+
+debugger = NodeDebugger()
+workflow = {...}
+
+async for log in run_workflow(workflow, debugger=debugger):
+    print(log)
+
+print(debugger.as_dict())
+```
+
+下图展示了调试日志的典型输出：
+
+![TriggerFlow Canvas 调试日志](../assets/triggerflow-debug-session.svg)
 
 ## 触发器与节点开发指南
 
