@@ -55,6 +55,22 @@ cd Agently
 pip install -e .
 ```
 
+## TriggerFlow Canvas
+
+TriggerFlow Canvas 是一套基于 TriggerFlow Runtime 的可视化工作流编排与执行体验，支持拖拽节点、实时查看运行日志，以及导出为 Python 代码与后端执行计划。详细的安装、配置与扩展说明请查阅《[TriggerFlow Canvas 用户指南](docs/user-guide/triggerflow-canvas.md)》。
+
+![TriggerFlow Canvas 概览](docs/assets/triggerflow-canvas-overview.svg)
+
+### 一键启动
+
+使用仓库内置的 Docker Compose 文件即可同时启动前端、后端与 TriggerFlow 核心：
+
+```bash
+docker compose up --build
+```
+
+服务启动后访问 `http://localhost:5173` 打开画布界面。
+
 ## What is Agently?
 
 Agently aims to provide an intuitive, efficient, and developer-friendly framework for GenAI application development. By deeply understanding the runtime control needs of model outputs, Agently bridges the gap between large language models and real-world applications.

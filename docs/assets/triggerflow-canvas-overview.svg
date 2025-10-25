@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1f2937" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1e3a8a" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#2563eb" stop-opacity="0.7" />
+    </linearGradient>
+    <style>
+      .title { font: 56px 'Inter', 'Helvetica Neue', Arial, sans-serif; fill: #f8fafc; font-weight: 700; }
+      .subtitle { font: 26px 'Inter', 'Helvetica Neue', Arial, sans-serif; fill: #cbd5f5; }
+      .panel-title { font: 22px 'Inter', 'Helvetica Neue', Arial, sans-serif; fill: #f8fafc; font-weight: 600; }
+      .panel-body { font: 18px 'Inter', 'Helvetica Neue', Arial, sans-serif; fill: #e2e8f0; }
+      .badge { font: 18px 'Inter', 'Helvetica Neue', Arial, sans-serif; fill: #1f2937; font-weight: 600; }
+    </style>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)" />
+  <text class="title" x="80" y="140">TriggerFlow Canvas</text>
+  <text class="subtitle" x="84" y="190">可视化编排 · 实时执行日志 · TriggerFlow Runtime 集成</text>
+
+  <rect x="80" y="240" width="520" height="360" rx="24" fill="url(#panel)" stroke="#93c5fd" stroke-opacity="0.4" stroke-width="2" />
+  <text class="panel-title" x="120" y="290">画布节点</text>
+  <text class="panel-body" x="120" y="330">• HTTP 触发器：监听 Webhook 或 API 调用</text>
+  <text class="panel-body" x="120" y="360">• 对话生成：连接 TriggerFlow 与大模型交互</text>
+  <text class="panel-body" x="120" y="390">• HTTP 请求：调用外部 SaaS / 内网服务</text>
+  <text class="panel-body" x="120" y="420">• 自定义节点：扩展执行计划、接入业务逻辑</text>
+
+  <rect x="660" y="240" width="520" height="200" rx="24" fill="#0f172a" opacity="0.85" stroke="#38bdf8" stroke-opacity="0.5" stroke-width="2" />
+  <text class="panel-title" x="700" y="290">实时运行日志</text>
+  <text class="panel-body" x="700" y="330">SSE 流式输出节点执行状态，便于调试与回放。</text>
+  <text class="panel-body" x="700" y="360">支持在 Canvas 中查看执行进度与错误详情。</text>
+
+  <rect x="660" y="470" width="520" height="130" rx="24" fill="#0f172a" opacity="0.85" stroke="#34d399" stroke-opacity="0.45" stroke-width="2" />
+  <text class="panel-title" x="700" y="520">部署选项</text>
+  <text class="panel-body" x="700" y="560">Docker Compose 一键启动前端、后端与 TriggerFlow 核心。</text>
+
+  <rect x="80" y="640" width="300" height="48" rx="24" fill="#facc15" />
+  <text class="badge" x="110" y="671">Drag, Connect, Run</text>
+</svg>
