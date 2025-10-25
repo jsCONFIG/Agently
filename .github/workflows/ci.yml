@@ -1,0 +1,60 @@
+name: TriggerFlow Canvas CI
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e . pytest pytest-asyncio ruff
+
+      - name: Run Ruff lint
+        run: ruff check .
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: triggerflow_canvas/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm install
+        working-directory: triggerflow_canvas/frontend
+
+      - name: Run ESLint
+        run: npm run lint
+        working-directory: triggerflow_canvas/frontend
+
+      - name: Run frontend unit tests
+        run: npm run test:run -- --run
+        working-directory: triggerflow_canvas/frontend
+
+      - name: Run backend unit tests
+        run: pytest tests/triggerflow_canvas/backend
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+        working-directory: triggerflow_canvas/frontend
+
+      - name: Run Playwright E2E tests
+        run: npm run e2e
+        working-directory: triggerflow_canvas/frontend
+
+      - name: Build Docker image
+        run: docker build -f docker/Dockerfile .

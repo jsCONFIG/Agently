@@ -3,9 +3,9 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
+from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlmodel.ext.asyncio.session import create_async_engine
 
 DATABASE_URL = "sqlite+aiosqlite:///./triggerflow_canvas.db"
 
