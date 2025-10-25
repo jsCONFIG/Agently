@@ -1,0 +1,156 @@
+:root {
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light;
+  color: #213547;
+  background-color: #f6f6f6;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+#root {
+  height: 100vh;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr 300px;
+  grid-template-rows: auto 1fr;
+  grid-template-areas: 'toolbar toolbar toolbar' 'library canvas properties';
+  height: 100%;
+}
+
+.toolbar {
+  grid-area: toolbar;
+  padding: 12px 16px;
+  background: #1f2937;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.node-library {
+  grid-area: library;
+  background: #ffffff;
+  border-right: 1px solid #d1d5db;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.canvas {
+  grid-area: canvas;
+  position: relative;
+  background: repeating-linear-gradient(90deg, #f3f4f6, #f3f4f6 24px, #e5e7eb 24px, #e5e7eb 25px),
+    repeating-linear-gradient(0deg, #f3f4f6, #f3f4f6 24px, #e5e7eb 24px, #e5e7eb 25px);
+}
+
+.canvas-node {
+  position: absolute;
+  width: 180px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #9ca3af;
+  padding: 12px;
+  cursor: grab;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.canvas-node.selected {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3);
+}
+
+.properties-panel {
+  grid-area: properties;
+  background: #ffffff;
+  border-left: 1px solid #d1d5db;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.node-library h2,
+.properties-panel h2 {
+  margin-top: 0;
+}
+
+.node-list {
+  display: grid;
+  gap: 12px;
+}
+
+.node-list button {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.node-list button:hover {
+  background: #f9fafb;
+  transform: translateY(-1px);
+}
+
+.property-field {
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.property-field label {
+  font-size: 0.85rem;
+  color: #4b5563;
+}
+
+.property-field input,
+.property-field textarea,
+.property-field select {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  font-size: 0.95rem;
+}
+
+.canvas-controls {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+.canvas-controls button {
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: none;
+  background: #1f2937;
+  color: white;
+  cursor: pointer;
+}
+
+.workflow-list {
+  margin-top: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.workflow-card {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+textarea {
+  resize: vertical;
+}

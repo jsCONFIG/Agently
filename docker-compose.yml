@@ -1,0 +1,33 @@
+version: '3.9'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: uvicorn triggerflow_canvas.backend.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      - triggerflow-core
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    volumes:
+      - ./triggerflow_canvas/frontend:/app
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+  triggerflow-core:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: python -m triggerflow_canvas.connector.core
+    volumes:
+      - .:/app
