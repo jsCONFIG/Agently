@@ -1,5 +1,7 @@
 import asyncio
 
+import pytest
+
 from triggerflow_canvas.connector.engine import NodeDebugger, TriggerFlowConnector, run_workflow
 
 
@@ -13,36 +15,51 @@ def _collect_logs(workflow, debugger=None):
     return asyncio.run(_inner())
 
 
-def test_debug_override_emits_simulated_output():
+def test_debugger_records_real_execution_events():
     workflow = {
         "id": "wf-1",
+        "name": "调试流程",
         "nodes": [
             {
-                "id": "node-1",
-                "type": "llm",
-                "label": "LLM 回复",
-                "configuration": {"model": "gpt-test", "prompt": "hello"},
+                "id": "node-trigger",
+                "type": "trigger.http",
+                "label": "HTTP 入口",
+                "configuration": {
+                    "method": "POST",
+                    "path": "/demo",
+                    "samplePayload": {"message": "hello"},
+                },
+            },
+            {
+                "id": "node-chat",
+                "type": "action.chat_completion",
+                "label": "对话节点",
+                "configuration": {"model": "gpt-test", "prompt": "hi"},
+            },
+        ],
+        "edges": [
+            {
+                "id": "edge-1",
+                "from": {"nodeId": "node-trigger", "portId": "out"},
+                "to": {"nodeId": "node-chat", "portId": "in"},
             }
         ],
-        "debug": {
-            "nodes": {
-                "node-1": {
-                    "outputs": ["你好，我是调试响应"],
-                    "input": {"messages": ["hi"]},
-                    "notes": "使用伪造的响应验证链路",
-                }
-            }
-        },
     }
 
     debugger = NodeDebugger()
-    logs = []
     logs = _collect_logs(workflow, debugger)
 
-    assert any("调试输出[1]: 你好，我是调试响应" in message for message in logs)
-    override_events = [event for event in debugger.timeline("node-1") if event.event == "override"]
-    assert override_events, "override event should be recorded"
-    assert override_events[0].payload["has_outputs"] is True
+    assert any("开始执行工作流" in entry for entry in logs)
+    assert any("节点 HTTP 入口" in entry for entry in logs)
+    assert any("工作流执行完成" in entry for entry in logs)
+
+    trigger_events = debugger.timeline("node-trigger")
+    chat_events = debugger.timeline("node-chat")
+
+    assert any(event.event == "start" for event in trigger_events)
+    assert any(event.event == "completed" for event in trigger_events)
+    assert any(event.event == "start" for event in chat_events)
+    assert any(event.event == "completed" for event in chat_events)
 
 
 def test_execute_without_nodes_reports_message():
@@ -54,3 +71,23 @@ def test_execute_without_nodes_reports_message():
 
     logs = asyncio.run(_inner())
     assert logs and "未包含可执行节点" in logs[0]
+
+
+@pytest.mark.asyncio()
+async def test_compile_rejects_multiple_branches() -> None:
+    connector = TriggerFlowConnector()
+    workflow = {
+        "id": "wf-invalid",
+        "nodes": [
+            {"id": "n1", "type": "trigger.http", "label": "入口", "configuration": {}},
+            {"id": "n2", "type": "action.chat_completion", "label": "A", "configuration": {}},
+            {"id": "n3", "type": "action.http_request", "label": "B", "configuration": {}},
+        ],
+        "edges": [
+            {"id": "e1", "from": {"nodeId": "n1", "portId": "out"}, "to": {"nodeId": "n2", "portId": "in"}},
+            {"id": "e2", "from": {"nodeId": "n1", "portId": "out"}, "to": {"nodeId": "n3", "portId": "in"}},
+        ],
+    }
+
+    with pytest.raises(ValueError):
+        await connector.compile(workflow)

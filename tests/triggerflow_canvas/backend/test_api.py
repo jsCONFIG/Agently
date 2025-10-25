@@ -114,7 +114,7 @@ async def test_workflow_crud_and_execution(async_client: AsyncClient) -> None:
             if line.startswith("event: end"):
                 break
 
-    assert any("开始执行节点" in message for message in messages)
+    assert any("开始执行工作流" in message for message in messages)
     assert any("工作流执行完成" in message for message in messages)
 
     delete_response = await async_client.delete(f"/api/workflows/{workflow_id}")

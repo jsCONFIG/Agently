@@ -10,8 +10,6 @@ services:
       - "8000:8000"
     volumes:
       - .:/app
-    depends_on:
-      - triggerflow-core
 
   frontend:
     image: node:20-alpine
@@ -23,11 +21,3 @@ services:
       - "5173:5173"
     depends_on:
       - backend
-
-  triggerflow-core:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    command: python -m triggerflow_canvas.connector.core
-    volumes:
-      - .:/app
