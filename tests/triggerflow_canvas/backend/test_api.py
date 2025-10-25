@@ -4,15 +4,18 @@ import json
 from collections.abc import AsyncIterator
 from pathlib import Path
 import sys
+from contextlib import asynccontextmanager
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 import pytest
+import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlmodel import SQLModel
+from sqlalchemy.pool import StaticPool
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from triggerflow_canvas.backend import database, main
@@ -20,14 +23,20 @@ from triggerflow_canvas.backend.run_manager import RunManager
 from triggerflow_canvas.connector import TriggerFlowConnector
 
 
-@pytest.fixture()
+@pytest_asyncio.fixture()
 async def async_client(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[AsyncClient]:
-    test_engine = create_async_engine("sqlite+aiosqlite:///:memory:", future=True)
+    test_engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        future=True,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
 
     async def init_db_override() -> None:
         async with test_engine.begin() as connection:
             await connection.run_sync(SQLModel.metadata.create_all)
 
+    @asynccontextmanager
     async def session_scope_override() -> AsyncIterator[AsyncSession]:
         async with AsyncSession(test_engine) as session:
             yield session
@@ -41,7 +50,7 @@ async def async_client(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[AsyncCl
 
     await init_db_override()
 
-    transport = ASGITransport(app=main.app, lifespan="auto")
+    transport = ASGITransport(app=main.app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         yield client
 
