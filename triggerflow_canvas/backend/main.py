@@ -3,7 +3,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Dict
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -41,8 +41,7 @@ async def get_workflow_repo() -> AsyncIterator[WorkflowRepository]:
 
 
 async def get_run_repo() -> AsyncIterator[RunRepository]:
-    async with session_scope() as session:
-        yield RunRepository(session)
+    yield RunRepository(session_scope)
 
 
 def _to_response(record: WorkflowRecord) -> WorkflowResponse:
@@ -104,11 +103,16 @@ async def update_workflow(
     return _to_response(saved)
 
 
-@app.delete("/api/workflows/{workflow_id}", status_code=204)
+@app.delete(
+    "/api/workflows/{workflow_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
 async def delete_workflow(
     workflow_id: str, repo: WorkflowRepository = Depends(get_workflow_repo)
-) -> None:
+) -> Response:
     await repo.delete(workflow_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.post("/api/workflows/{workflow_id}/execute", response_model=ExecuteResponse)
